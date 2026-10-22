@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Detective Whiskers & The Passive Voice Mystery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { touch-action: manipulation; background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        canvas { display: block; margin: 0 auto; background: #1e293b; border-radius: 1rem; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3); }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center p-2 sm:p-4 select-none">
+    <!-- Header -->
+    <header class="w-full max-w-4xl flex justify-between items-center bg-slate-800/85 backdrop-blur px-4 py-2 rounded-xl border border-slate-700 shadow-lg">
+        <div class="flex items-center space-x-2">
+            <span class="text-2xl">🐱🔍</span>
+            <div>
+                <h1 class="text-sm sm:text-lg font-bold text-amber-400">Detective Whiskers</h1>
+                <p class="text-xs text-slate-400">Passive Voice Mystery</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <div class="bg-slate-900 px-3 py-1 rounded-lg border border-slate-700 text-xs sm:text-sm">
+                Score: <span id="score" class="font-bold text-amber-400">0</span>/6
+            </div>
+            <button id="soundToggle" class="bg-slate-700 hover:bg-slate-600 p-2 rounded-lg transition text-sm" title="Toggle Sound">🔊</button>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="w-full max-w-4xl flex-1 flex flex-col items-center justify-center my-2 relative">
+        <div class="relative w-full aspect-[4/3] max-h-[42vh] sm:max-h-[50vh] flex items-center justify-center">
+            <canvas id="gameCanvas" width="800" height="600" class="w-full h-full object-contain"></canvas>
+        </div>
+
+        <!-- Dialogue & Task Panel -->
+        <div id="game-card" class="w-full bg-slate-800/90 backdrop-blur border border-slate-700 rounded-2xl p-3 sm:p-5 shadow-2xl mt-2 flex flex-col justify-between">
+            <div class="flex items-start space-x-3 mb-3">
+                <div class="bg-amber-500/20 text-amber-400 p-2 rounded-xl text-xl hidden sm:block">🐾</div>
+                <div>
+                    <p id="dialogue" class="text-xs sm:text-base text-slate-200 font-medium leading-relaxed">
+                        Loading case...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Options / Answers Grid -->
+            <div id="options-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
+                <!-- Dynamic buttons inserted via JS -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer / Credits -->
+    <footer class="text-center text-xs text-slate-500 pb-1">
+        Grammar Quest • Passive Voice (Present, Past, Present Perfect)
+    </footer>
+
+    <!-- Game Script -->
+    <script>
+        // Audio Context Setup
+        let soundEnabled = true;
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            if (!soundEnabled) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+
+            if (type === 'click') {
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(600, now + 0.08);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                osc.start(now);
+                osc.stop(now + 0.08);
+            } else if (type === 'correct') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now);
+                osc.frequency.setValueAtTime(659.25, now + 0.1);
+                osc.frequency.setValueAtTime(783.99, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else if (type === 'wrong') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(220, now);
+                osc.frequency.linearRampToValueAtTime(150, now + 0.2);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            }
+        }
+
+        document.getElementById('soundToggle').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundToggle').textContent = soundEnabled ? '🔊' : '🔇';
+        });
+
+        // Game Data
+        const questions = [
+            {
+                prompt: "Look at the shards! The antique vase _____ yesterday by someone clumsy.",
+                options: ["was broken", "is broken", "has been broken", "broke"],
+                correct: 0,
+                explanation: "Correct! Past Simple Passive ('was broken') is used with a specific past time marker ('yesterday')."
+            },
+            {
+                prompt: "The museum doors _____ every evening at 8 PM sharp.",
+                options: ["are locked", "were locked", "have been locked", "locked"],
+                correct: 0,
+                explanation: "Spot on! Present Simple Passive ('are locked') describes a regular routine or schedule."
+            },
+            {
+                prompt: "Look! The missing painting _____ in the old library just now!",
+                options: ["has been found", "was found", "is found", "finds"],
+                correct: 0,
+                explanation: "Brilliant! Present Perfect Passive ('has been found') emphasizes a recent discovery with relevance now."
+            },
+            {
+                prompt: "All valuable artifacts _____ in a secure underground safe during storms.",
+                options: ["are kept", "were kept", "have been kept", "keep"],
+                correct: 0,
+                explanation: "Correct! Present Simple Passive ('are kept') states a general rule or permanent procedure."
+            },
+            {
+                prompt: "The footprint near the window _____ by the thief last night.",
+                options: ["was left", "is left", "has been left", "leaves"],
+                correct: 0,
+                explanation: "Spot on! Past Simple Passive ('was left') refers to an action completed at a definite time last night."
+            },
+            {
+                prompt: "The security cameras _____ twice this month to prevent break-ins.",
+                options: ["have been upgraded", "were upgraded", "are upgraded", "upgrade"],
+                correct: 0,
+                explanation: "Case solved! Present Perfect Passive ('have been upgraded') connects past action to the current state."
+            }
+        ];
+
+        let currentQ = 0;
+        let score = 0;
+        let answered = false;
+
+        // Canvas Drawing
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        function drawScene() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Museum background gradient
+            const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGrad.addColorStop(0, '#1e1b4b');
+            bgGrad.addColorStop(1, '#0f172a');
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Wall paneling / picture frame decoration
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(40, 40, 200, 150);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(40, 40, 200, 150);
+            ctx.fillStyle = '#475569';
+            ctx.font = '14px sans-serif';
+            ctx.fillText('🏛️ Museum Gallery', 60, 120);
+
+            // Floor
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(0, 480, canvas.width, 120);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 490, canvas.width, 110);
+
+            // Pedestal
+            ctx.fillStyle = '#475569';
+            ctx.fillRect(520, 360, 160, 130);
+            ctx.fillStyle = '#64748b';
+            ctx.fillRect(500, 340, 200, 25);
+
+            // Broken Vase on Pedestal / Floor
+            ctx.save();
+            ctx.translate(600, 340);
+            // Shards
+            ctx.fillStyle = '#3b82f6';
+            ctx.beginPath();
+            ctx.moveTo(-30, 0); ctx.lineTo(-10, -25); ctx.lineTo(10, 0); ctx.closePath();
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(15, 0); ctx.lineTo(35, -20); ctx.lineTo(45, 0); ctx.closePath();
+            ctx.fill();
+            // Shards on floor
+            ctx.fillRect(-60, 130, 15, 10);
+            ctx.fillRect(50, 125, 20, 12);
+            ctx.restore();
+
+            // Detective Cat (Whiskers)
+            ctx.save();
+            ctx.translate(220, 310);
+
+            // Body
+            ctx.fillStyle = '#d97706';
+            ctx.beginPath();
+            ctx.ellipse(0, 80, 60, 75, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Head
+            ctx.beginPath();
+            ctx.arc(0, -10, 50, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Ears
+            ctx.beginPath();
+            ctx.moveTo(-45, -35); ctx.lineTo(-65, -75); ctx.lineTo(-20, -50); ctx.closePath();
+            ctx.moveTo(45, -35); ctx.lineTo(65, -75); ctx.lineTo(20, -50); ctx.closePath();
+            ctx.fill();
+
+            // Inner ears
+            ctx.fillStyle = '#fbcfe8';
+            ctx.beginPath();
+            ctx.moveTo(-40, -40); ctx.lineTo(-55, -65); ctx.lineTo(-25, -48); ctx.closePath();
+            ctx.moveTo(40, -40); ctx.lineTo(55, -65); ctx.lineTo(25, -48); ctx.closePath();
+            ctx.fill();
+
+            // Hat (Deerstalker)
+            ctx.fillStyle = '#1e293b';
+            ctx.beginPath();
+            ctx.arc(0, -45, 45, Math.PI, 0, false);
+            ctx.fill();
+            ctx.fillRect(-55, -45, 110, 8);
+
+            // Eyes & Face
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(-18, -15, 7, 0, Math.PI * 2);
+            ctx.arc(18, -15, 7, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(-20, -17, 2, 0, Math.PI * 2);
+            ctx.arc(16, -17, 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Nose & Whiskers
+            ctx.fillStyle = '#f43f5e';
+            ctx.beginPath();
+            ctx.arc(0, -2, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = '#0f172a';
+            ctx.lineWidth = 2;
+            ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(-45, -5); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(-10, 5); ctx.lineTo(-45, 10); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(45, -5); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(10, 5); ctx.lineTo(45, 10); ctx.stroke();
+
+            // Bow tie
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.moveTo(0, 35); ctx.lineTo(-20, 25); ctx.lineTo(-20, 45); ctx.closePath();
+            ctx.moveTo(0, 35); ctx.lineTo(20, 25); ctx.lineTo(20, 45); ctx.closePath();
+            ctx.fill();
+
+            // Magnifying glass in paw
+            ctx.strokeStyle = '#94a3b8';
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(30, 60); ctx.lineTo(60, 90); ctx.stroke();
+            ctx.strokeStyle = '#f59e0b';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+            ctx.arc(75, 105, 25, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function loadQuestion() {
+            answered = false;
+            const q = questions[currentQ];
+            document.getElementById('dialogue').textContent = q.prompt;
+            
+            const container = document.getElementById('options-container');
+            container.innerHTML = '';
+
+            q.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = 'w-full py-2.5 px-4 bg-slate-700/80 hover:bg-slate-600 active:scale-98 border border-slate-600 rounded-xl text-xs sm:text-sm font-medium text-left transition flex items-center justify-between group';
+                btn.innerHTML = `<span>${opt}</span><span class="text-xs text-slate-400 group-hover:text-amber-400">🔍 Select</span>`;
+                btn.onclick = () => selectOption(idx);
+                container.appendChild(btn);
+            });
+            drawScene();
+        }
+
+        function selectOption(idx) {
+            if (answered) return;
+            answered = true;
+            const q = questions[currentQ];
+            const container = document.getElementById('options-container');
+            const buttons = container.children;
+
+            if (idx === q.correct) {
+                score++;
+                playSound('correct');
+                document.getElementById('score').textContent = score;
+                buttons[idx].className = 'w-full py-2.5 px-4 bg-emerald-600 border border-emerald-500 rounded-xl text-xs sm:text-sm font-medium text-left text-white flex items-center justify-between shadow-lg';
+                buttons[idx].innerHTML = `<span>${q.options[idx]}</span><span>✅ Correct!</span>`;
+                document.getElementById('dialogue').textContent = q.explanation;
+            } else {
+                playSound('wrong');
+                buttons[idx].className = 'w-full py-2.5 px-4 bg-rose-600/80 border border-rose-500 rounded-xl text-xs sm:text-sm font-medium text-left text-white flex items-center justify-between';
+                buttons[idx].innerHTML = `<span>${q.options[idx]}</span><span>❌ Oops</span>`;
+                buttons[q.correct].className = 'w-full py-2.5 px-4 bg-emerald-600 border border-emerald-500 rounded-xl text-xs sm:text-sm font-medium text-left text-white flex items-center justify-between shadow-lg';
+                buttons[q.correct].innerHTML = `<span>${q.options[q.correct]}</span><span>✨ Correct Answer</span>`;
+                document.getElementById('dialogue').textContent = "Not quite! " + q.explanation;
+            }
+
+            setTimeout(() => {
+                currentQ++;
+                if (currentQ < questions.length) {
+                    loadQuestion();
+                } else {
+                    showFinalScreen();
+                }
+            }, 3500);
+        }
+
+        function showFinalScreen() {
+            const container = document.getElementById('options-container');
+            document.getElementById('dialogue').innerHTML = `🎉 <strong>Case Closed!</strong> You scored ${score} out of ${questions.length}. Detective Whiskers is proud of your grammar skills!`;
+            container.innerHTML = `
+                <button onclick="restartGame()" class="w-full py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold rounded-xl text-center shadow-lg transition">
+                    🔄 Play Again / Solve Another Case
+                </button>
+            `;
+        }
+
+        function restartGame() {
+            currentQ = 0;
+            score = 0;
+            document.getElementById('score').textContent = score;
+            loadQuestion();
+        }
+
+        loadQuestion();
+    </script>
+</body>
+</html>
